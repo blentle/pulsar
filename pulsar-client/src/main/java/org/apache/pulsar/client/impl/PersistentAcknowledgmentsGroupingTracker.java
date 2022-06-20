@@ -118,10 +118,7 @@ public class PersistentAcknowledgmentsGroupingTracker implements Acknowledgments
     @Override
     public boolean isDuplicate(@NonNull MessageId messageId) {
         final MessageId messageIdOfLastAck = lastCumulativeAck.messageId;
-        if (messageIdOfLastAck == null) {
-            return false;
-        }
-        if (messageId.compareTo(messageIdOfLastAck) <= 0) {
+        if (messageIdOfLastAck != null && messageId.compareTo(messageIdOfLastAck) <= 0) {
             // Already included in a cumulative ack
             return true;
         } else {
@@ -315,9 +312,15 @@ public class PersistentAcknowledgmentsGroupingTracker implements Acknowledgments
                 return this.currentIndividualAckFuture;
             } finally {
                 this.lock.readLock().unlock();
+                if (pendingIndividualBatchIndexAcks.size() >= MAX_ACK_GROUP_SIZE) {
+                    flush();
+                }
             }
         } else {
             doIndividualBatchAckAsync(batchMessageId);
+            if (pendingIndividualBatchIndexAcks.size() >= MAX_ACK_GROUP_SIZE) {
+                flush();
+            }
             return CompletableFuture.completedFuture(null);
         }
     }
@@ -340,15 +343,9 @@ public class PersistentAcknowledgmentsGroupingTracker implements Acknowledgments
                     return this.currentCumulativeAckFuture;
                 } finally {
                     this.lock.readLock().unlock();
-                    if (pendingIndividualBatchIndexAcks.size() >= MAX_ACK_GROUP_SIZE) {
-                        flush();
-                    }
                 }
             } else {
                 doCumulativeAckAsync(messageId, bitSet);
-                if (pendingIndividualBatchIndexAcks.size() >= MAX_ACK_GROUP_SIZE) {
-                    flush();
-                }
                 return CompletableFuture.completedFuture(null);
             }
         }

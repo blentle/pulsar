@@ -61,7 +61,10 @@ public class TransactionMetaStoreHandler extends HandlerState
     private final long transactionCoordinatorId;
     private final ConnectionHandler connectionHandler;
     private final ConcurrentLongHashMap<OpBase<?>> pendingRequests =
-        new ConcurrentLongHashMap<>(16, 1);
+            ConcurrentLongHashMap.<OpBase<?>>newBuilder()
+                    .expectedItems(16)
+                    .concurrencyLevel(1)
+                    .build();
     private final ConcurrentLinkedQueue<RequestTime> timeoutQueue;
 
     protected final Timer timer;
@@ -128,9 +131,6 @@ public class TransactionMetaStoreHandler extends HandlerState
                 return;
             }
 
-            connectionHandler.setClientCnx(cnx);
-            cnx.registerTransactionMetaStoreHandler(transactionCoordinatorId, this);
-
             // if broker protocol version < 19, don't send TcClientConnectRequest to broker.
             if (cnx.getRemoteEndpointProtocolVersion() > ProtocolVersion.v18.getValue()) {
                 long requestId = client.newRequestId();
@@ -144,6 +144,8 @@ public class TransactionMetaStoreHandler extends HandlerState
                             cnx.channel().close();
                         }
 
+                        connectionHandler.setClientCnx(cnx);
+                        cnx.registerTransactionMetaStoreHandler(transactionCoordinatorId, this);
                         if (!this.connectFuture.isDone()) {
                             this.connectFuture.complete(null);
                         }
@@ -167,6 +169,9 @@ public class TransactionMetaStoreHandler extends HandlerState
             } else {
                 if (!changeToReadyState()) {
                     cnx.channel().close();
+                } else {
+                    connectionHandler.setClientCnx(cnx);
+                    cnx.registerTransactionMetaStoreHandler(transactionCoordinatorId, this);
                 }
                 this.connectFuture.complete(null);
             }

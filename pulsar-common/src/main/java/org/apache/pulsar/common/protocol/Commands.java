@@ -1082,28 +1082,43 @@ public class Commands {
         return cmd;
     }
 
-    public static ByteBuf newGetTopicsOfNamespaceRequest(String namespace, long requestId, Mode mode) {
+    public static ByteBuf newGetTopicsOfNamespaceRequest(String namespace, long requestId, Mode mode,
+                                                         String topicsPattern, String topicsHash) {
         BaseCommand cmd = localCmd(Type.GET_TOPICS_OF_NAMESPACE);
         CommandGetTopicsOfNamespace topics = cmd.setGetTopicsOfNamespace();
         topics.setNamespace(namespace);
         topics.setRequestId(requestId);
         topics.setMode(mode);
+        if (topicsPattern != null) {
+            topics.setTopicsPattern(topicsPattern);
+        }
+        if (topicsHash != null) {
+            topics.setTopicsHash(topicsHash);
+        }
         return serializeWithSize(cmd);
     }
 
-    public static BaseCommand newGetTopicsOfNamespaceResponseCommand(List<String> topics, long requestId) {
+    public static BaseCommand newGetTopicsOfNamespaceResponseCommand(List<String> topics, String topicsHash,
+                                                                     boolean filtered, boolean changed,
+                                                                     long requestId) {
         BaseCommand cmd = localCmd(Type.GET_TOPICS_OF_NAMESPACE_RESPONSE);
         CommandGetTopicsOfNamespaceResponse topicsResponse = cmd.setGetTopicsOfNamespaceResponse();
         topicsResponse.setRequestId(requestId);
         for (int i = 0; i < topics.size(); i++) {
             topicsResponse.addTopic(topics.get(i));
         }
-
+        if (topicsHash != null) {
+            topicsResponse.setTopicsHash(topicsHash);
+        }
+        topicsResponse.setFiltered(filtered);
+        topicsResponse.setChanged(changed);
         return cmd;
     }
 
-    public static ByteBuf newGetTopicsOfNamespaceResponse(List<String> topics, long requestId) {
-        return serializeWithSize(newGetTopicsOfNamespaceResponseCommand(topics, requestId));
+    public static ByteBuf newGetTopicsOfNamespaceResponse(List<String> topics, String topicsHash,
+                                                          boolean filtered, boolean changed, long requestId) {
+        return serializeWithSize(newGetTopicsOfNamespaceResponseCommand(
+                topics, topicsHash, filtered, changed, requestId));
     }
 
     private static final ByteBuf cmdPing;
@@ -1264,16 +1279,16 @@ public class Commands {
         return serializeWithSize(cmd);
     }
 
-    public static ByteBuf newTxnResponse(long requestId, long txnIdLeastBits, long txnIdMostBits) {
+    public static BaseCommand newTxnResponse(long requestId, long txnIdLeastBits, long txnIdMostBits) {
         BaseCommand cmd = localCmd(Type.NEW_TXN_RESPONSE);
         cmd.setNewTxnResponse()
                 .setRequestId(requestId)
                 .setTxnidMostBits(txnIdMostBits)
                 .setTxnidLeastBits(txnIdLeastBits);
-        return serializeWithSize(cmd);
+        return cmd;
     }
 
-    public static ByteBuf newTxnResponse(long requestId, long txnIdMostBits, ServerError error, String errorMsg) {
+    public static BaseCommand newTxnResponse(long requestId, long txnIdMostBits, ServerError error, String errorMsg) {
         BaseCommand cmd = localCmd(Type.NEW_TXN_RESPONSE);
         CommandNewTxnResponse response = cmd.setNewTxnResponse()
                 .setRequestId(requestId)
@@ -1282,7 +1297,7 @@ public class Commands {
         if (errorMsg != null) {
             response.setMessage(errorMsg);
         }
-        return serializeWithSize(cmd);
+        return cmd;
     }
 
     public static ByteBuf newAddPartitionToTxn(long requestId, long txnIdLeastBits, long txnIdMostBits,
@@ -1363,16 +1378,17 @@ public class Commands {
         return cmd;
     }
 
-    public static ByteBuf newEndTxnResponse(long requestId, long txnIdLeastBits, long txnIdMostBits) {
+    public static BaseCommand newEndTxnResponse(long requestId, long txnIdLeastBits, long txnIdMostBits) {
         BaseCommand cmd = localCmd(Type.END_TXN_RESPONSE);
         cmd.setEndTxnResponse()
                 .setRequestId(requestId)
                 .setTxnidLeastBits(txnIdLeastBits)
                 .setTxnidMostBits(txnIdMostBits);
-        return serializeWithSize(cmd);
+        return cmd;
     }
 
-    public static ByteBuf newEndTxnResponse(long requestId, long txnIdMostBits, ServerError error, String errorMsg) {
+    public static BaseCommand newEndTxnResponse(long requestId, long txnIdMostBits,
+                                                ServerError error, String errorMsg) {
         BaseCommand cmd = localCmd(Type.END_TXN_RESPONSE);
         CommandEndTxnResponse response = cmd.setEndTxnResponse()
                 .setRequestId(requestId)
@@ -1381,7 +1397,7 @@ public class Commands {
         if (errorMsg != null) {
             response.setMessage(errorMsg);
         }
-        return serializeWithSize(cmd);
+        return cmd;
     }
 
     public static ByteBuf newEndTxnOnPartition(long requestId, long txnIdLeastBits, long txnIdMostBits, String topic,
@@ -1775,6 +1791,24 @@ public class Commands {
         }
     }
 
+    /**
+     * Peek the message metadata from the buffer and return a deep copy of the metadata.
+     *
+     * If you want to hold multiple {@link MessageMetadata} instances from multiple buffers, you must call this method
+     * rather than {@link Commands#peekMessageMetadata(ByteBuf, String, long)}, which returns a thread local reference,
+     * see {@link Commands#LOCAL_MESSAGE_METADATA}.
+     */
+    public static MessageMetadata peekAndCopyMessageMetadata(
+            ByteBuf metadataAndPayload, String subscription, long consumerId) {
+        final MessageMetadata localMetadata = peekMessageMetadata(metadataAndPayload, subscription, consumerId);
+        if (localMetadata == null) {
+            return null;
+        }
+        final MessageMetadata metadata = new MessageMetadata();
+        metadata.copyFrom(localMetadata);
+        return metadata;
+    }
+
     private static final byte[] NONE_KEY = "NONE_KEY".getBytes(StandardCharsets.UTF_8);
     public static byte[] peekStickyKey(ByteBuf metadataAndPayload, String topic, String subscription) {
         try {
@@ -1837,8 +1871,10 @@ public class Commands {
             return org.apache.pulsar.common.api.proto.ProducerAccessMode.Shared;
         case WaitForExclusive:
             return org.apache.pulsar.common.api.proto.ProducerAccessMode.WaitForExclusive;
+        case ExclusiveWithFencing:
+            return org.apache.pulsar.common.api.proto.ProducerAccessMode.ExclusiveWithFencing;
         default:
-            throw new IllegalArgumentException("Unknonw access mode: " + accessMode);
+            throw new IllegalArgumentException("Unknown access mode: " + accessMode);
         }
     }
 
@@ -1851,6 +1887,8 @@ public class Commands {
             return ProducerAccessMode.Shared;
         case WaitForExclusive:
             return ProducerAccessMode.WaitForExclusive;
+        case ExclusiveWithFencing:
+            return ProducerAccessMode.ExclusiveWithFencing;
         default:
             throw new IllegalArgumentException("Unknonw access mode: " + accessMode);
         }
