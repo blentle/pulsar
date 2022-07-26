@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 ````
 
 
-Pulsar Python client library is a wrapper over the existing [C++ client library](client-libraries-cpp) and exposes all of the [same features](/api/cpp). You can find the code in the [Python directory](https://github.com/apache/pulsar/tree/master/pulsar-client-cpp/python) of the C++ client code.
+Pulsar Python client library is a wrapper over the existing [C++ client library](client-libraries-cpp.md) and exposes all of the [same features](/api/cpp). You can find the code in the [Python directory](https://github.com/apache/pulsar/tree/master/pulsar-client-cpp/python) of the C++ client code.
 
 All the methods in producer, consumer, and reader of a Python client are thread-safe.
 
@@ -74,7 +74,7 @@ The complete Python API reference is available at [api/python](/api/python).
 
 ## Examples
 
-You can find a variety of Python code examples for the [pulsar-client](/pulsar-client-cpp/python) library.
+You can find a variety of Python code examples for the `pulsar-client` library.
 
 ### Producer example
 
@@ -192,7 +192,7 @@ client.close()
 ```
 
 ### Create a Python client with multiple advertised listeners
-To ensure clients in both internal and external networks can connect to a Pulsar cluster, Pulsar introduces [advertisedListeners](concepts-multiple-advertised-listeners).
+To ensure clients in both internal and external networks can connect to a Pulsar cluster, Pulsar introduces [advertisedListeners](concepts-multiple-advertised-listeners.md).
 
 The following example creates a Python client using multiple advertised listeners:
 
@@ -516,7 +516,7 @@ msg.value()
 #### Record
 
 You can declare a `JsonSchema` by passing a class that inherits
-from `pulsar.schema.Record` and defines the fields as class variables. This is similar to using `AvroSchema`. The only difference is to use  `JsonSchema` instead of `AvroSchema` when defining schema type as shown below. For how to use `AvroSchema` via record, see [here](client-libraries-python.md#method-1-record).
+from `pulsar.schema.Record` and defines the fields as class variables. This is similar to using `AvroSchema`. The only difference is to use  `JsonSchema` instead of `AvroSchema` when defining schema type as shown below. For how to use `AvroSchema` via record, see [heres-python.md#method-1-record).
 
 ```
 
@@ -542,7 +542,7 @@ consumer = client.subscribe(
 
 ### Configuration
 
-To use the end-to-end encryption feature in the Python client, you need to configure `publicKeyPath` and `privateKeyPath` for both producer and consumer.
+To use the end-to-end encryption feature in the Python client, you need to configure `publicKeyPath` for producer and `privateKeyPath` for consumer.
 
 ```
 
@@ -581,7 +581,7 @@ This section provides step-by-step instructions on how to use the end-to-end enc
    import pulsar
 
    publicKeyPath = "./public.pem"
-   privateKeyPath = "./private.pem"
+   privateKeyPath = ""
    crypto_key_reader = pulsar.CryptoKeyReader(publicKeyPath, privateKeyPath)
    client = pulsar.Client('pulsar://localhost:6650')
    producer = client.create_producer(topic='encryption', encryption_key='encryption', crypto_key_reader=crypto_key_reader)
@@ -600,7 +600,7 @@ This section provides step-by-step instructions on how to use the end-to-end enc
    
    import pulsar
 
-   publicKeyPath = "./public.pem"
+   publicKeyPath = ""
    privateKeyPath = "./private.pem"
    crypto_key_reader = pulsar.CryptoKeyReader(publicKeyPath, privateKeyPath)
    client = pulsar.Client('pulsar://localhost:6650')
